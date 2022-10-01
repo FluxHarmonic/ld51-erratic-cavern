@@ -1,0 +1,9 @@
+(define (erratic window)
+  (import ))
+
+(define window-width (* 1280 2))
+(define window-height (* 720 2))
+
+(define window (window-create window-width
+                              window-height
+                              "Erratic Cavern"))

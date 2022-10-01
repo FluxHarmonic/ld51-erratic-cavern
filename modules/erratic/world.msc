@@ -1,0 +1,80 @@
+(define-module (erratic world)
+  (import (mesche fs)
+          (mesche math)
+          (mesche array)
+          (mesche string)
+          (substratic renderer)))
+
+(define-record-type world
+  (fields width
+          height
+          tile-size
+          tiles
+          items
+          entities))
+
+(define wall-color (rgb 95 67 35))
+
+(define (create-world width height tile-size tiles) :export
+  (let ((world (make-world :width width
+                           :height height
+                           :tile-size tile-size
+                           :tiles tiles
+                           :entities '())))
+    ;; TODO: Generate world
+    world))
+
+(define (world-add-item! world item)
+  (world-items-set! world
+                    (cons item
+                          (world-items world))))
+
+(define (read-world-data file-path) :export
+  (let ((world-string (file-read-all file-path)))
+    (let ((world-data
+           (map string->number
+                (string-split world-string
+                              (lambda (c)
+                                (or (string=? c " ")
+                                    (string=? c "\n")))))))
+      world-data)))
+
+(define (world-is-passable? world x y) :export
+  ;; 0 is passable!
+  ;; TODO: Is there more logic needed here?
+  (let ((result (list-ref (world-tiles world)
+                          (+ x (* y (world-width world))))))
+    (and (pair? result)
+         (equal? 0 (car result)))))
+
+(define (world-pixel-width world) :export
+  (* (world-width world)
+     (world-tile-size world)))
+
+(define (world-pixel-height world) :export
+  (* (world-height world)
+     (world-tile-size world)))
+
+(define (render-world renderer world x y) :export
+  (let ((tile-size (world-tile-size world))
+        (max-x (world-width world))
+        (max-y (world-height world)))
+    (let loop ((tiles (world-tiles world))
+               (map-x 0)
+               (map-y 0))
+      (if (eqv? map-y max-y)
+          t
+          (begin
+            (if (eqv? (car tiles) 1)
+                (renderer-draw-rect renderer
+                                    (+ x (* map-x tile-size))
+                                    (+ y (* map-y tile-size))
+                                    tile-size
+                                    tile-size
+                                    wall-color))
+            (loop (cdr tiles)
+                  (% (+ map-x 1) max-x)
+                  (+ map-y (floor (/ (+ map-x 1) max-x)))))))
+
+
+    ))

@@ -1,0 +1,18 @@
+(define-module (erratic assets)
+  (import (substratic font)))
+
+;; (font-load-file "assets/fonts/Thintel.ttf" 75)
+;; (font-load-file "assets/fonts/Thintel.ttf" 250)
+;; (font-load-file "assets/fonts/Thintel.ttf" 125)
+
+(define fonts '())
+
+(define (load-font name path size) :export
+  (let ((existing (assq name fonts)))
+    (if existing
+        (cdr existing)
+        (let ((font (font-load-file path size)))
+          ;; Add the new font to the list
+          (set! fonts (cons (cons name font)
+                            fonts))
+          font)))

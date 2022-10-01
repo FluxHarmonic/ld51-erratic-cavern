@@ -1,0 +1,25 @@
+(define-module (erratic player)
+  (import (substratic renderer)
+          (erratic world)))
+
+(define-record-type player
+  (fields x y items))
+
+(define player-color (rgb 77 46 82))
+
+(define (create-player x y) :export
+  (make-player :x x
+               :y y
+               :items '()))
+
+(define (render-player renderer player world->screen tile-size) :export
+  (let ((pos (world->screen (player-x player)
+                            (player-y player)))
+        (player-size (* tile-size 0.8))
+        (player-offset (* tile-size 0.1)))
+    (renderer-draw-rect renderer
+                        (+ (car pos) player-offset)
+                        (+ (cdr pos) player-offset)
+                        player-size
+                        player-size
+                        player-color)))

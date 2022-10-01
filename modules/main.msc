@@ -1,0 +1,76 @@
+(define-module (erratic main)
+  (import (mesche array)
+          (mesche math)
+          (mesche list)
+          (mesche time)
+          (mesche string)
+          (substratic font)
+          (substratic input)
+          (substratic engine)
+          (substratic window)
+          (substratic physics)
+          (substratic texture)
+          (substratic renderer)
+          (erratic game)))
+
+(define window-width (* 1280 2))
+(define window-height (* 720 2))
+
+(define window (window-create window-width
+                              window-height
+                              "Erratic Cavern"))
+(define input-state (input-init window))
+(define renderer (renderer-create window))
+
+;; Load game assets
+(define small-font (font-load-file "assets/fonts/Thintel.ttf" 75))
+(define result-font (font-load-file "assets/fonts/Thintel.ttf" 250))
+(define prompt-font (font-load-file "assets/fonts/Thintel.ttf" 125))
+
+(define screen-scale 4.0)
+
+;; Show the window
+(window-show window)
+
+;; Get an fps counter
+(define current-fps (make-fps-counter))
+
+;; These will track the current game logic and render functions
+(define current-updater update-game)
+(define current-renderer render-game)
+
+;; Initialize the game
+(init-game)
+
+(define key-bindings
+  (list (cons input-key-code-w 'player-move-up)
+        (cons input-key-code-s 'player-move-down)
+        (cons input-key-code-a 'player-move-left)
+        (cons input-key-code-d 'player-move-right)))
+
+(define (handle-input-events)
+  (let next-event ((input-event (input-event-take input-state)))
+    (if input-event
+        (begin
+          (let ((binding (and (input-event-key-down? input-event)
+                              (assq (input-event-key-code input-event)
+                                    key-bindings))))
+            (if binding
+                (handle-game-event (cdr binding)))
+            (next-event (input-event-take input-state)))))))
+
+(define (main-updater time-delta)
+  (if (not (window-needs-close? window))
+      (begin
+        (handle-input-events)
+        (current-updater time-delta))))
+
+(define (main-renderer renderer)
+  ;; Clear the screen
+  (renderer-clear renderer 0 0 0)
+  (current-renderer renderer window-width window-height))
+
+;; This will run the game functions until the updater returns nil
+(run-engine-loop :renderer renderer
+                 :update-func main-updater
+                 :render-func main-renderer)

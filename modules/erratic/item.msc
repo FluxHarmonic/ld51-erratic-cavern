@@ -1,0 +1,26 @@
+(define-module (erratic item)
+  (import (substratic renderer)))
+
+(define-record-type item
+  (fields x
+          y
+          kind
+          color))
+
+(define (create-item x y kind color) :export
+  (make-item :x x
+             :y y
+             :kind kind
+             :color color))
+
+(define (render-item renderer item world->screen tile-size) :export
+  (let ((pos (world->screen (item-x item)
+                            (item-y item)))
+        (item-size (* tile-size 0.6))
+        (item-offset (* tile-size 0.2)))
+    (renderer-draw-rect renderer
+                        (+ (car pos) item-offset)
+                        (+ (cdr pos) item-offset)
+                        item-size
+                        item-size
+                        (item-color item))))

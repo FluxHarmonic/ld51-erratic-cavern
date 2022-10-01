@@ -1,0 +1,41 @@
+
+* Design
+
+Since this is a top-down dungeon crawler, we need a grid-based map.  It doesn't require scrolling or any extent larger than the current screen (for now).
+
+The tiles and walls will be the same size, something like 64x64.
+
+** Every 10 Seconds
+
+To comply with the theme of this compo, we will implement the 10 seconds behavior like so:
+
+- The target item position will be changed to a new random location, somewhere that is passable on the map (or a specifically marked item location).  The position also must be some distance away from the player's current position so that it isn't inordinately easy to win.
+
+** Ideas
+
+- Every time an item is picked up an enemy appears in the map
+- Once you pick up a certain set of items an exit appears
+- Set of items is different on each level
+
+* Development and Debugging
+
+#+begin_src sh
+
+  # To debug, run M-x gud-gdb with this command:
+  guix shell --pure -m manifest.scm -- gdb --args bin/dev/erratic-cavern
+
+#+end_src
+
+* Tasks
+
+** TODO Add item position randomization at the interval
+** TODO Fix the issue with item removal on pickup
+** TODO Add entities that have logic on step and also can be randomized at the interval
+** TODO Add configurable player start and item locations
+** TODO Finish the first map
+** TODO Add 2 more maps
+** TODO Integrate classes and generic methods?
+** TODO Implement a win and lose state (time limit)
+** TODO Implement unlockable doors with key pickups
+** TODO Implement traps that can end the game (maybe be disabled with an item?)
+** TODO Make the window show up centered when it opens

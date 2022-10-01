@@ -1,0 +1,130 @@
+(define-module (erratic game)
+  (import (substratic font)
+          (substratic input)
+          (substratic renderer)
+          (erratic assets)
+          (erratic item)
+          (erratic player)
+          (erratic world)))
+
+(define result-font nil)
+
+(define title-text "Erratic Cavern!")
+(define title-text-width nil)
+
+;; Target a world of size 30x20
+(define tile-size 64)
+(define world-width 34)
+(define world-height 18)
+
+(define world-data (read-world-data "assets/worlds/world1.txt"))
+(define world (create-world world-width
+                            world-height
+                            tile-size
+                            world-data))
+
+(define player (create-player 3 2))
+
+(define items (list (create-item 14 8 'chalice (rgb 93 91 14))))
+
+(define (init-game) :export
+  (set! result-font (load-font 'result-font "assets/fonts/Thintel.ttf" 250))
+  (set! title-text-width (font-text-width result-font title-text)))
+
+(define (update-game time-delta) :export
+  ;; TODO: Check for whether 10 seconds has passed
+  t)
+
+(define (calculate-new-pos player delta-x delta-y)
+  (cons (+ (player-x player) delta-x)
+        (+ (player-y player) delta-y)))
+
+(define (move-player player new-x new-y)
+  ;; Set the new player position
+  (player-x-set! player new-x)
+  (player-y-set! player new-y)
+
+  ;; Check if we walked over an item
+  (set! items
+        (let loop ((remaining items)
+                   (new-items '()))
+          (if (pair? remaining)
+              (if (and (equal? (player-x player)
+                               (item-x (car remaining)))
+                       (equal? (player-y player)
+                               (item-y (car remaining))))
+                  (begin
+                    ;; TODO: Add item to inventory
+                    (display "PICKED UP ITEM!\n")
+                    (loop (cdr remaining)
+                          new-items))
+                  (loop (cdr remaining)
+                        (cons (car remaining)
+                              new-items)))
+
+              ;; Loop has ended, return the new item list
+              (reverse new-items))))
+
+  ;; TODO: Why is this necessary to make the item removal stick?
+  (display "ITEMS: ")
+  (display items)
+  (display "\n")
+
+  ;; TODO: Check if we walked over a trap
+
+  ;; TODO: Move all entities
+  )
+
+(define (handle-game-event event) :export
+  (let ((new-pos
+         (if (equal? event 'player-move-up)
+             (calculate-new-pos player 0 -1)
+             (if (equal? event 'player-move-down)
+                 (calculate-new-pos player 0 1)
+                 (if (equal? event 'player-move-left)
+                     (calculate-new-pos player -1 0)
+                     (if (equal? event 'player-move-right)
+                         (calculate-new-pos player 1 0)))))))
+    (if (pair? new-pos)
+        (begin
+          (if (world-is-passable? world (car new-pos) (cdr new-pos))
+              (move-player player
+                           (car new-pos)
+                           (cdr new-pos)))))))
+
+(define (world->screen offset-x offset-y)
+  (lambda (x y)
+    (cons (+ offset-x (* x tile-size))
+          (+ offset-y (* y tile-size)))))
+
+(define (render-game renderer window-width window-height) :export
+  (let ((world-x (- (/ window-width 2)
+                    (/ (world-pixel-width world) 2)))
+        (world-y (- (/ window-height 2)
+                    (/ (world-pixel-height world) 2))))
+    ;; (render-text renderer
+    ;;              result-font
+    ;;              title-text
+    ;;              (- (/ window-width 2)
+    ;;                 (/ title-text-width 2))
+    ;;              150)
+
+    ;; Render the game world
+    (render-world renderer
+                  world
+                  world-x
+                  world-y)
+
+    ;; Render the items
+    (map (lambda (item)
+           (render-item renderer
+                        item
+                        (world->screen world-x world-y)
+                        tile-size))
+         items)
+
+    ;; Render the player
+    (render-player renderer
+                   player
+                   (world->screen world-x world-y)
+                   tile-size)))
