@@ -13,16 +13,27 @@
           tiles
           items
           entities
+          item-positions
           floor-positions))
 
 (define wall-color (rgb 95 67 35))
+
+;; 0 - floor
+;; 1 - wall
+;; 2 - door
+;; 3 - item
+;; 4 - trap
+;; 5 - player start
 
 (define (create-world width height tile-size tiles) :export
   (let ((world (make-world :width width
                            :height height
                            :tile-size tile-size
                            :tiles tiles
-                           :entities '()
+                           :item-positions (gather-positions
+                                             tiles
+                                             (lambda (tile-kind)
+                                               (eqv? tile-kind 3)))
                            :floor-positions (gather-positions
                                              tiles
                                              (lambda (tile-kind)
@@ -50,7 +61,7 @@
   (let ((result (list-ref (world-tiles world)
                           (+ x (* y (world-width world))))))
     (and (pair? result)
-         (equal? 0 (car result)))))
+         (not (equal? 1 (car result))))))
 
 (define (world-pixel-width world) :export
   (* (world-width world)

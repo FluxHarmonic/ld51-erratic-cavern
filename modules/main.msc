@@ -11,7 +11,8 @@
           (substratic physics)
           (substratic texture)
           (substratic renderer)
-          (erratic game)))
+          (erratic game)
+          (erratic assets)))
 
 (define window-width (* 1280 2))
 (define window-height (* 720 2))
@@ -22,12 +23,8 @@
 (define input-state (input-init window))
 (define renderer (renderer-create window))
 
-;; Load game assets
-(define small-font (font-load-file "assets/fonts/Thintel.ttf" 75))
-(define result-font (font-load-file "assets/fonts/Thintel.ttf" 250))
-(define prompt-font (font-load-file "assets/fonts/Thintel.ttf" 125))
-
-(define screen-scale 4.0)
+;; Load fonts
+(define small-font (load-font 'small-font "assets/fonts/Thintel.ttf" 75))
 
 ;; Show the window
 (window-show window)
@@ -68,7 +65,15 @@
 (define (main-renderer renderer)
   ;; Clear the screen
   (renderer-clear renderer 0 0 0)
-  (current-renderer renderer window-width window-height))
+  (current-renderer renderer window-width window-height)
+
+  (let ((fps (current-fps)))
+    (if fps
+        (render-text renderer
+                     small-font
+                     (string-append "FPS: " (number->string fps 3))
+                     (- window-width 220)
+                     60))))
 
 ;; This will run the game functions until the updater returns nil
 (run-engine-loop :renderer renderer

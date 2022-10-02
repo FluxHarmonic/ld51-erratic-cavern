@@ -1,0 +1,24 @@
+(define-module (erratic patrol)
+  (import (substratic renderer)))
+
+(define-record-type patrol
+  (fields x
+          y))
+
+(define (create-patrol x y) :export
+  (make-patrol :x x
+               :y y))
+
+(define patrol-color (rgb 71 90 24))
+
+(define (render-patrol renderer patrol world->screen tile-size) :export
+  (let ((pos (world->screen (patrol-x patrol)
+                            (patrol-y patrol)))
+        (patrol-size (* tile-size 0.8))
+        (patrol-offset (* tile-size 0.1)))
+    (renderer-draw-rect renderer
+                        (+ (car pos) patrol-offset)
+                        (+ (cdr pos) patrol-offset)
+                        patrol-size
+                        patrol-size
+                        patrol-color)))

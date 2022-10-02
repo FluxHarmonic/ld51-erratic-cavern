@@ -28,19 +28,46 @@ To comply with the theme of this compo, we will implement the 10 seconds behavio
 
 * Tasks
 
-** TODO Add item position randomization at the interval
+** DONE Add item position randomization at the interval
+CLOSED: [2022-10-02 Sun 09:30]
+:LOGBOOK:
+- State "DONE"       from "TODO"       [2022-10-02 Sun 09:30]
+:END:
 
 - [X] Keep a list of all valid item locations
 - [X] Pick a new position for each item (ideally unique position for each item)
-- Show a timer gauge at the bottom of the screen
+- [X] Make sure we don't pick the player position
+- [X] Show a timer gauge at the bottom of the screen
 
-** TODO Fix the issue with item removal on pickup
-** TODO Add entities that have logic on step and also can be randomized at the interval
-** TODO Add configurable player start and item locations
+** DONE Add configurable player start
+CLOSED: [2022-10-02 Sun 09:42]
+:LOGBOOK:
+- State "DONE"       from "TODO"       [2022-10-02 Sun 09:42]
+:END:
+** TODO Add patrols that have logic on step and also can be randomized at the interval
+** TODO Implement traps that can end the game (maybe be disabled with an item?)
+** TODO Implement locked doors
+** TODO Implement a win and lose state (time limit)
 ** TODO Finish the first map
 ** TODO Add 2 more maps
 ** TODO Integrate classes and generic methods?
-** TODO Implement a win and lose state (time limit)
 ** TODO Implement unlockable doors with key pickups
-** TODO Implement traps that can end the game (maybe be disabled with an item?)
+** TODO Fix the issue with item removal on pickup
 ** TODO Make the window show up centered when it opens
+
+* Emacs World Editor Config
+
+#+begin_src emacs-lisp
+
+  (defun setup-erratic-world-highlighting ()
+    (setq font-lock-defaults '(nil))
+    (font-lock-add-keywords 'text-mode
+                            '(("1" . font-lock-warning-face)
+                              ("2" . font-lock-type-face)
+                              ("3" . font-lock-function-name-face)
+                              ("4" . font-lock-keyword-face)
+                              ("5" . font-lock-preprocessor-face))))
+
+  (add-hook 'text-mode-hook #'setup-erratic-world-highlighting)
+
+#+end_src

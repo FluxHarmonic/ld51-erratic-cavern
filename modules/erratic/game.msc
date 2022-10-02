@@ -7,6 +7,7 @@
           (erratic assets)
           (erratic world)
           (erratic player)
+          (erratic patrol)
           (erratic positions)))
 
 (define result-font nil)
@@ -25,17 +26,44 @@
                             tile-size
                             world-data))
 
-(define player (create-player 3 2))
-
-(define items (list (create-item 14 8 'chalice (rgb 93 91 14))))
+(define player nil)
+(define patrols '())
+(define items '())
+(define doors '())
+(define traps '())
 
 (define (init-game) :export
+  ;; Load assets
   (set! result-font (load-font 'result-font "assets/fonts/Thintel.ttf" 250))
-  (set! title-text-width (font-text-width result-font title-text)))
+  (set! title-text-width (font-text-width result-font title-text))
 
-(define (update-game time-delta) :export
-  ;; TODO: Check for whether 10 seconds has passed
-  t)
+  ;; Set the initial player position
+  (let ((player-positions
+         (gather-positions world-data
+                           (lambda (tile-kind)
+                             (eqv? tile-kind 5)))))
+    (let ((start-position (position->world (car (list-take (positions-list player-positions)
+                                                           (rand-int (positions-count player-positions))))
+                                           world-width)))
+      (set! player (create-player (car start-position)
+                                  (cdr start-position)))))
+
+  ;; Create the patrols
+  (let loop ((max-patrols (+ 2 (rand-int 4)))
+             (count 0))
+    (if (< count max-patrols)
+        (begin
+          (set! patrols (cons (create-patrol 0 0)
+                              patrols))
+          (loop max-patrols
+                (+ count 1)))))
+
+  ;; Create initial entities and pick positions
+  (set! items (list (create-item 0 0 'chalice (rgb 93 91 14))))
+  (randomize-all-entities!))
+
+(define randomize-interval 10)
+(define time-until-randomize randomize-interval)
 
 (define (calculate-new-pos player delta-x delta-y)
   (cons (+ (player-x player) delta-x)
@@ -43,24 +71,24 @@
 
 (define (list-take lst item-index)
   (let loop ((remaining lst)
-             (result '())
+             (new-list '())
              (index 0))
     (if (null? remaining)
         (begin
           (display "BAD INDEX\n")
           nil)
         (if (eqv? index item-index)
-            ;; Put the item at the front of the result
+            ;; Put the item at the front of the new-list
             ;; and remove it from where it previously was
             (cons (car remaining)
-                  (cons result (cdr remaining)))
+                  (append new-list (cdr remaining)))
             (loop (cdr remaining)
                   ;; TODO: Use set-cdr! to make this faster
-                  (append result
+                  (append new-list
                           (list (car remaining)))
                   (+ index 1))))))
 
-(define (randomize-positions! entities valid-positions setter)
+(define (randomize-positions! entities valid-positions setter acceptable?)
   (let loop ((remaining entities)
              (positions (positions-list valid-positions))
              (num-positions (positions-count valid-positions)))
@@ -69,20 +97,23 @@
                                       (rand-int num-positions))))
           (let ((new-pos (position->world (car take-result)
                                           world-width)))
-            (setter (car remaining)
-                    (car new-pos)
-                    (cdr new-pos))
+            ;; Before using the position, make sure it is acceptable
+            (if (or (not (function? acceptable? t))
+                    (acceptable? (car new-pos)
+                                 (cdr new-pos)))
+                (begin
+                  (setter (car remaining)
+                          (car new-pos)
+                          (cdr new-pos))
 
-            (loop (cdr remaining)
-                  (cdr take-result)
-                  (- num-positions 1)))))))
-
-;; TODO REMOVE
-(randomize-positions! items
-                      (world-floor-positions world)
-                      (lambda (item x y)
-                        (item-x-set! item x)
-                        (item-y-set! item y)))
+                  (loop (cdr remaining)
+                        (cdr take-result)
+                        (- num-positions 1)))
+                ;; If the position wasn't acceptable, run the iteration again
+                ;; for the same item and same positions list
+                (loop remaining
+                      positions
+                      num-positions)))))))
 
 (define (move-player player new-x new-y)
   ;; Set the new player position
@@ -132,10 +163,55 @@
                          (calculate-new-pos player 1 0)))))))
     (if (pair? new-pos)
         (begin
-          (if (world-is-passable? world (car new-pos) (cdr new-pos))
-              (move-player player
-                           (car new-pos)
-                           (cdr new-pos)))))))
+          (if (world-is-passable? world
+                                  (car new-pos)
+                                  (cdr new-pos))
+              (begin
+                (move-player player
+                             (car new-pos)
+                             (cdr new-pos))))))))
+
+(define (is-close-to-player? player x y distance)
+  (let ((result
+         (and (<= (abs (- (player-x player) x))
+                  distance)
+              (<= (abs (- (player-y player) y))
+                  distance))))
+    result))
+
+(define (randomize-all-entities!)
+  ;; Randomize patrol positions
+  (randomize-positions! patrols
+                        (world-floor-positions world)
+                        (lambda (patrol x y)
+                          (patrol-x-set! patrol x)
+                          (patrol-y-set! patrol  y))
+                        (lambda (x y)
+                          (not (is-close-to-player? player x y 1))))
+
+  ;; Randomize item positions
+  (randomize-positions! items
+                        (world-item-positions world)
+                        (lambda (item x y)
+                          (item-x-set! item x)
+                          (item-y-set! item y))
+                        (lambda (x y)
+                          (not (is-close-to-player? player x y 3)))))
+
+(define (update-game time-delta) :export
+  ;; Update the randomization timer
+  (set! time-until-randomize
+        (- time-until-randomize time-delta))
+
+  ;; If it's time to randomize, do it
+  (if (< time-until-randomize 0)
+      (begin
+        ;; Randomize item positions
+        (randomize-all-entities!)
+
+        ;; Reset the timer
+        (set! time-until-randomize randomize-interval)))
+  t)
 
 (define (world->screen offset-x offset-y)
   (lambda (x y)
@@ -147,13 +223,6 @@
                     (/ (world-pixel-width world) 2)))
         (world-y (- (/ window-height 2)
                     (/ (world-pixel-height world) 2))))
-    ;; (render-text renderer
-    ;;              result-font
-    ;;              title-text
-    ;;              (- (/ window-width 2)
-    ;;                 (/ title-text-width 2))
-    ;;              150)
-
     ;; Render the game world
     (render-world renderer
                   world
@@ -168,8 +237,25 @@
                         tile-size))
          items)
 
+    ;; Render the patrols
+    (map (lambda (patrol)
+           (render-patrol renderer
+                        patrol
+                        (world->screen world-x world-y)
+                        tile-size))
+         patrols)
+
     ;; Render the player
     (render-player renderer
                    player
                    (world->screen world-x world-y)
-                   tile-size)))
+                   tile-size)
+
+    ;; Render the randomization timer
+    (renderer-draw-rect renderer
+                        world-x
+                        (- window-height 125)
+                        (* 200 (max 0 (/ time-until-randomize
+                                         randomize-interval)))
+                        50
+                        (rgb 255 0 255))))
