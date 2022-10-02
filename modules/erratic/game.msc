@@ -4,6 +4,7 @@
           (substratic font)
           (substratic input)
           (substratic renderer)
+          (erratic door)
           (erratic item)
           (erratic world)
           (erratic utils)
@@ -96,7 +97,23 @@
 
   ;; Create initial entities and pick positions
   ;; TODO: Create a random list of items
-  (set! items (list (create-item 0 0 'chalice (rgb 93 91 14))))
+  (set! items (list (create-item 'chalice (rgb 255 255 0))))
+
+  ;; Create some number of locked doors and keys
+  (let ((door-positions (world-door-positions world)))
+    ;; Generate one less than the total number of door positions so that they
+    ;; can actually move, but ensure that at least one door is generated!
+    (if (> (positions-count door-positions) 0)
+        (let ((num-doors (+ 1 (rand-int (- (positions-count door-positions) 2)))))
+          (let loop ((count 0))
+            (if (< count num-doors)
+                (begin
+                  (set! items (cons (create-item 'key (rgb 255 0 0))
+                                    items))
+                  (set! doors (cons (create-door) doors))
+                  (loop (+ count 1))))))))
+
+  ;; Randomize the position of all items and patrols
   (randomize-all-entities!)
 
   ;; The game is ready!
@@ -166,15 +183,24 @@
         (let loop ((remaining items)
                    (new-items '()))
           (if (pair? remaining)
-              (if (and (equal? (player-x player)
-                               (item-x (car remaining)))
-                       (equal? (player-y player)
-                               (item-y (car remaining))))
+              (if (same-position? (player-x player)
+                                  (player-y player)
+                                  (item-x (car remaining))
+                                  (item-y (car remaining)))
                   (begin
-                    ;; TODO: Add item to inventory
-                    (change-state! 'win)
-                    (loop (cdr remaining)
-                          new-items))
+                    (if (eqv? 'chalice
+                              (item-kind (car remaining)))
+                        (change-state! 'win)
+                        (begin
+                          (player-items-set! player
+                                             (cons (car remaining)
+                                                   (player-items player)))))
+
+                    ;; Since we found the item, return the items list
+                    ;; without the touched item
+                    (append new-items (cdr remaining)))
+
+                  ;; Not at the same position, keep looping
                   (loop (cdr remaining)
                         (cons (car remaining)
                               new-items)))
@@ -195,15 +221,15 @@
                       (player-x player)
                       (player-y player)
                       (lambda (x y)
-                        (world-is-passable? world x y))))
+                        (is-passable? world x y nil))))
        patrols)
 
   ;; Check if the player is caught
   (map (lambda (patrol)
-         (if (and (eqv? (player-x player)
-                        (patrol-x patrol))
-                  (eqv? (player-y player)
-                        (patrol-y patrol)))
+         (if (same-position? (player-x player)
+                             (player-y player)
+                             (patrol-x patrol)
+                             (patrol-y patrol))
              (change-state! 'lose)))
        patrols))
 
@@ -227,6 +253,29 @@
                         (input-event-key-code input-event))
                   (change-state! 'quit))))))
 
+(define (is-passable? world x y has-key)
+  ;; Check if the position is a wall or a door
+  (and (world-is-passable? world x y)
+       (let loop ((rest-doors doors))
+         (if (null? rest-doors)
+             t
+             (if (not (same-position? x y
+                                      (door-x (car rest-doors))
+                                      (door-y (car rest-doors))))
+                 (loop (cdr rest-doors))
+                 ;; Does the player have a key
+                 (if has-key
+                     (begin
+                       ;; Delete the door and return t because it is now
+                       ;; passable
+                       (display "DOORS BEFORE: ")
+                       (display doors)
+                       (display "\nDOORS AFTER: ")
+                       (set! doors (delete (car rest-doors) doors))
+                       (display doors)
+                       (display "\n")
+                       t)))))))
+
 (define (handle-game-event event) :export
   (let ((new-pos
          (if (equal? event 'player-move-up)
@@ -239,9 +288,12 @@
                          (calculate-new-pos player 1 0)))))))
     (if (pair? new-pos)
         (begin
-          (if (world-is-passable? world
-                                  (car new-pos)
-                                  (cdr new-pos))
+          (if (is-passable? world
+                            (car new-pos)
+                            (cdr new-pos)
+                            (memp (lambda (item)
+                                    (eqv? 'key (item-kind item)))
+                                  (player-items player)))
               (begin
                 (move-player player
                              (car new-pos)
@@ -253,7 +305,7 @@
                         (world-floor-positions world)
                         (lambda (patrol x y)
                           (patrol-x-set! patrol x)
-                          (patrol-y-set! patrol  y))
+                          (patrol-y-set! patrol y))
                         (lambda (x y)
                           (not (is-close-to-position? (player-x player)
                                                       (player-y player)
@@ -267,37 +319,48 @@
                           (item-x-set! item x)
                           (item-y-set! item y))
                         (lambda (x y)
+                          ;; TODO: Make sure we don't land on a door
                           (not (is-close-to-position? (player-x player)
                                                       (player-y player)
                                                       x y
-                                                      3)))))
+                                                      3))))
+
+  ;; Randomize the door positions
+  (randomize-positions! doors
+                        (world-door-positions world)
+                        (lambda (door x y)
+                          (door-x-set! door x)
+                          (door-y-set! door y))
+                        (lambda (x y) t)))
 
 (define (update-game time-delta) :export
   (if (eqv? state 'quit)
       ;; If we're in the quit state, exit the loop by returning nil
       nil
       (begin
-        ;; Update the randomization timer
-        (set! time-until-randomize
-              (- time-until-randomize time-delta))
-
-        ;; Update the game timer
-        (set! time-left-in-game (max 0
-                                     (- time-left-in-game
-                                        time-delta)))
-
-        ;; Is the game over?
-        (if (eqv? time-left-in-game 0)
-            (display "GAME OVER MAN\n"))
-
-        ;; If it's time to randomize, do it
-        (if (< time-until-randomize 0)
+        (if (eqv? state 'playing)
             (begin
-              ;; Randomize item positions
-              (randomize-all-entities!)
+              ;; Update the randomization timer
+              (set! time-until-randomize
+                    (- time-until-randomize time-delta))
 
-              ;; Reset the timer
-              (set! time-until-randomize randomize-interval)))
+              ;; Update the game timer
+              (set! time-left-in-game (max 0
+                                           (- time-left-in-game
+                                              time-delta)))
+
+              ;; Is the game over?
+              (if (eqv? time-left-in-game 0)
+                  (change-state! 'lose))
+
+              ;; If it's time to randomize, do it
+              (if (< time-until-randomize 0)
+                  (begin
+                    ;; Randomize item positions
+                    (randomize-all-entities!)
+
+                    ;; Reset the timer
+                    (set! time-until-randomize randomize-interval)))))
 
         ;; Continue running the game loop
         t)))
@@ -337,6 +400,17 @@
                         tile-size))
          items)
 
+    ;; Render the inventory
+    (let ((x 350))
+      (map (lambda (item)
+             (render-item renderer
+                          item
+                          (lambda (world-x world-y)
+                            (set! x (+ (+ x tile-size) 5))
+                            (cons x (- window-height 131)))
+                          tile-size))
+           (player-items player)))
+
     ;; Render the patrols
     (map (lambda (patrol)
            (render-patrol renderer
@@ -344,6 +418,14 @@
                           (world->screen world-x world-y)
                           tile-size))
          patrols)
+
+    ;; Render the doors
+    (map (lambda (door)
+           (render-door renderer
+                        door
+                        (world->screen world-x world-y)
+                        tile-size))
+         doors)
 
     ;; Render the player
     (render-player renderer

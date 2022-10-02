@@ -7,9 +7,9 @@
           kind
           color))
 
-(define (create-item x y kind color) :export
-  (make-item :x x
-             :y y
+(define (create-item kind color) :export
+  (make-item :x 0
+             :y 0
              :kind kind
              :color color))
 

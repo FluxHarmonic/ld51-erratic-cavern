@@ -1,0 +1,21 @@
+(define-module (erratic door)
+  (import (substratic renderer)))
+
+(define-record-type door
+  (fields x y))
+
+(define door-color (rgb 0 255 255))
+
+(define (create-door) :export
+  (make-door :x 0
+             :y 0))
+
+(define (render-door renderer door world->screen tile-size) :export
+  (let ((pos (world->screen (door-x door)
+                            (door-y door))))
+    (renderer-draw-rect renderer
+                        (car pos)
+                        (cdr pos)
+                        tile-size
+                        tile-size
+                        door-color)))

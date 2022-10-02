@@ -14,6 +14,7 @@
           items
           entities
           item-positions
+          door-positions
           floor-positions))
 
 (define wall-color (rgb 95 67 35))
@@ -31,9 +32,13 @@
                            :tile-size tile-size
                            :tiles tiles
                            :item-positions (gather-positions
-                                             tiles
-                                             (lambda (tile-kind)
-                                               (eqv? tile-kind 3)))
+                                            tiles
+                                            (lambda (tile-kind)
+                                              (eqv? tile-kind 3)))
+                           :door-positions (gather-positions
+                                            tiles
+                                            (lambda (tile-kind)
+                                              (eqv? tile-kind 2)))
                            :floor-positions (gather-positions
                                              tiles
                                              (lambda (tile-kind)

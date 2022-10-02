@@ -20,6 +20,10 @@
                           (list (car remaining)))
                   (+ index 1))))))
 
+(define (same-position? one-x one-y two-x two-y) :export
+  (and (eqv? one-x two-x)
+       (eqv? one-y two-y)))
+
 (define (is-close-to-position? one-x one-y two-x two-y distance) :export
   (and (<= (abs (- one-x two-x))
            distance)
