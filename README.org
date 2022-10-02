@@ -29,6 +29,11 @@ To comply with the theme of this compo, we will implement the 10 seconds behavio
 * Tasks
 
 ** TODO Add item position randomization at the interval
+
+- [X] Keep a list of all valid item locations
+- [X] Pick a new position for each item (ideally unique position for each item)
+- Show a timer gauge at the bottom of the screen
+
 ** TODO Fix the issue with item removal on pickup
 ** TODO Add entities that have logic on step and also can be randomized at the interval
 ** TODO Add configurable player start and item locations

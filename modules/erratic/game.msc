@@ -1,11 +1,13 @@
 (define-module (erratic game)
-  (import (substratic font)
+  (import (mesche math)
+          (substratic font)
           (substratic input)
           (substratic renderer)
-          (erratic assets)
           (erratic item)
+          (erratic assets)
+          (erratic world)
           (erratic player)
-          (erratic world)))
+          (erratic positions)))
 
 (define result-font nil)
 
@@ -38,6 +40,49 @@
 (define (calculate-new-pos player delta-x delta-y)
   (cons (+ (player-x player) delta-x)
         (+ (player-y player) delta-y)))
+
+(define (list-take lst item-index)
+  (let loop ((remaining lst)
+             (result '())
+             (index 0))
+    (if (null? remaining)
+        (begin
+          (display "BAD INDEX\n")
+          nil)
+        (if (eqv? index item-index)
+            ;; Put the item at the front of the result
+            ;; and remove it from where it previously was
+            (cons (car remaining)
+                  (cons result (cdr remaining)))
+            (loop (cdr remaining)
+                  ;; TODO: Use set-cdr! to make this faster
+                  (append result
+                          (list (car remaining)))
+                  (+ index 1))))))
+
+(define (randomize-positions! entities valid-positions setter)
+  (let loop ((remaining entities)
+             (positions (positions-list valid-positions))
+             (num-positions (positions-count valid-positions)))
+    (if (pair? remaining)
+        (let ((take-result (list-take positions
+                                      (rand-int num-positions))))
+          (let ((new-pos (position->world (car take-result)
+                                          world-width)))
+            (setter (car remaining)
+                    (car new-pos)
+                    (cdr new-pos))
+
+            (loop (cdr remaining)
+                  (cdr take-result)
+                  (- num-positions 1)))))))
+
+;; TODO REMOVE
+(randomize-positions! items
+                      (world-floor-positions world)
+                      (lambda (item x y)
+                        (item-x-set! item x)
+                        (item-y-set! item y)))
 
 (define (move-player player new-x new-y)
   ;; Set the new player position

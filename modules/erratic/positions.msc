@@ -1,0 +1,28 @@
+(define-module (erratic positions)
+  (import (mesche math)))
+
+(define-record-type positions
+  (fields list
+          count))
+
+(define (gather-positions tiles predicate) :export
+  (let loop ((remaining tiles)
+             (index 0)
+             (positions '())
+             (count 0))
+    (if (null? remaining)
+        (make-positions :list (reverse positions)
+                        :count count)
+        (let ((keep (predicate (car remaining))))
+          (loop (cdr remaining)
+                (+ index 1)
+                (if keep
+                    (cons index positions)
+                    positions)
+                (if keep
+                    (+ count 1)
+                    count))))))
+
+(define (position->world position world-width) :export
+  (cons (% position world-width)
+        (floor (/ position world-width))))

@@ -3,6 +3,7 @@
           (mesche math)
           (mesche array)
           (mesche string)
+          (erratic positions)
           (substratic renderer)))
 
 (define-record-type world
@@ -11,7 +12,8 @@
           tile-size
           tiles
           items
-          entities))
+          entities
+          floor-positions))
 
 (define wall-color (rgb 95 67 35))
 
@@ -20,8 +22,11 @@
                            :height height
                            :tile-size tile-size
                            :tiles tiles
-                           :entities '())))
-    ;; TODO: Generate world
+                           :entities '()
+                           :floor-positions (gather-positions
+                                             tiles
+                                             (lambda (tile-kind)
+                                               (not (eqv? tile-kind 1)))))))
     world))
 
 (define (world-add-item! world item)
@@ -74,7 +79,4 @@
                                     wall-color))
             (loop (cdr tiles)
                   (% (+ map-x 1) max-x)
-                  (+ map-y (floor (/ (+ map-x 1) max-x)))))))
-
-
-    ))
+                  (+ map-y (floor (/ (+ map-x 1) max-x)))))))))
