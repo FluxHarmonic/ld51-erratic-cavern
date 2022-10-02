@@ -1,0 +1,27 @@
+(define-module (erratic utils)
+  (import (mesche math)))
+
+(define (list-take lst item-index) :export
+  (let loop ((remaining lst)
+             (new-list '())
+             (index 0))
+    (if (null? remaining)
+        (begin
+          (display "BAD INDEX\n")
+          nil)
+        (if (eqv? index item-index)
+            ;; Put the item at the front of the new-list
+            ;; and remove it from where it previously was
+            (cons (car remaining)
+                  (append new-list (cdr remaining)))
+            (loop (cdr remaining)
+                  ;; TODO: Use set-cdr! to make this faster
+                  (append new-list
+                          (list (car remaining)))
+                  (+ index 1))))))
+
+(define (is-close-to-position? one-x one-y two-x two-y distance) :export
+  (and (<= (abs (- one-x two-x))
+           distance)
+       (<= (abs (- one-y two-y))
+           distance)))

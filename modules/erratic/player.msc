@@ -5,7 +5,7 @@
 (define-record-type player
   (fields x y items))
 
-(define player-color (rgb 77 46 82))
+(define player-color (rgb 71 90 24))
 
 (define (create-player x y) :export
   (make-player :x x

@@ -44,10 +44,24 @@ CLOSED: [2022-10-02 Sun 09:42]
 :LOGBOOK:
 - State "DONE"       from "TODO"       [2022-10-02 Sun 09:42]
 :END:
-** TODO Add patrols that have logic on step and also can be randomized at the interval
+** DONE Add patrols that have logic on step and also can be randomized at the interval
+CLOSED: [2022-10-02 Sun 14:35]
+:LOGBOOK:
+- State "DONE"       from "TODO"       [2022-10-02 Sun 14:35]
+:END:
+** DONE Implement a win and lose state (time limit)
+CLOSED: [2022-10-02 Sun 15:35]
+:LOGBOOK:
+- State "DONE"       from "TODO"       [2022-10-02 Sun 15:35]
+:END:
+
+- If you grab the goal item, you win!
+- If an enemy or trap touches you, you lose!
+- If the time runs out, you lose!
+
+** TODO Add raycasting for patrol vision
 ** TODO Implement traps that can end the game (maybe be disabled with an item?)
 ** TODO Implement locked doors
-** TODO Implement a win and lose state (time limit)
 ** TODO Finish the first map
 ** TODO Add 2 more maps
 ** TODO Integrate classes and generic methods?

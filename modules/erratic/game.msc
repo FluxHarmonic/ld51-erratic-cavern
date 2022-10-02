@@ -1,41 +1,76 @@
 (define-module (erratic game)
   (import (mesche math)
+          (mesche string)
           (substratic font)
           (substratic input)
           (substratic renderer)
           (erratic item)
-          (erratic assets)
           (erratic world)
+          (erratic utils)
+          (erratic assets)
           (erratic player)
           (erratic patrol)
           (erratic positions)))
 
 (define result-font nil)
+(define prompt-font nil)
+(define small-font nil)
 
 (define title-text "Erratic Cavern!")
 (define title-text-width nil)
 
-;; Target a world of size 30x20
+(define win-text "You Win!")
+(define win-text-width nil)
+
+(define lose-text "You Lose!")
+(define lose-text-width nil)
+
+(define result-text nil)
+(define result-text-width nil)
+(define result-text-height 250)
+
+(define prompt-text "Play Again? (Y/N)")
+(define prompt-text-width nil)
+(define prompt-text-height 175)
+
 (define tile-size 64)
 (define world-width 34)
 (define world-height 18)
+(define fade-color (rgba 0 0 0 150))
+
+;; Define key bindings for gameplay
+(define key-bindings
+  (list (cons input-key-code-w 'player-move-up)
+        (cons input-key-code-s 'player-move-down)
+        (cons input-key-code-a 'player-move-left)
+        (cons input-key-code-d 'player-move-right)))
 
 (define world-data (read-world-data "assets/worlds/world1.txt"))
-(define world (create-world world-width
-                            world-height
-                            tile-size
-                            world-data))
 
+;; TODO: Store these in a record?
 (define player nil)
 (define patrols '())
 (define items '())
 (define doors '())
 (define traps '())
+(define world (create-world world-width
+                            world-height
+                            tile-size
+                            world-data))
+(define state nil)
 
-(define (init-game) :export
-  ;; Load assets
-  (set! result-font (load-font 'result-font "assets/fonts/Thintel.ttf" 250))
-  (set! title-text-width (font-text-width result-font title-text))
+(define (change-state! new-state)
+  (set! state new-state)
+  (if (eqv? state 'win)
+      (begin (set! result-text win-text)
+             (set! result-text-width win-text-width))
+      (begin (set! result-text lose-text)
+             (set! result-text-width lose-text-width))))
+
+(define (reset-game-state!)
+  ;; Reset game timers
+  (set! time-until-randomize randomize-interval)
+  (set! time-left-in-game 100)
 
   ;; Set the initial player position
   (let ((player-positions
@@ -49,6 +84,7 @@
                                   (cdr start-position)))))
 
   ;; Create the patrols
+  (set! patrols '())
   (let loop ((max-patrols (+ 2 (rand-int 4)))
              (count 0))
     (if (< count max-patrols)
@@ -59,34 +95,39 @@
                 (+ count 1)))))
 
   ;; Create initial entities and pick positions
+  ;; TODO: Create a random list of items
   (set! items (list (create-item 0 0 'chalice (rgb 93 91 14))))
-  (randomize-all-entities!))
+  (randomize-all-entities!)
+
+  ;; The game is ready!
+  (set! state 'playing))
+
+(define (init-game) :export
+  ;; Load assets
+  (set! small-font (load-font 'small-font "assets/fonts/Thintel.ttf" 75))
+  (set! result-font (load-font 'result-font
+                               "assets/fonts/Thintel.ttf"
+                               result-text-height))
+  (set! prompt-font (load-font 'prompt-font
+                               "assets/fonts/Thintel.ttf"
+                               prompt-text-height))
+
+  ;; Calculate reused text sizes
+  (set! title-text-width (font-text-width result-font title-text))
+  (set! win-text-width (font-text-width result-font win-text))
+  (set! lose-text-width (font-text-width result-font lose-text))
+  (set! prompt-text-width (font-text-width prompt-font prompt-text))
+
+  ;; Reset the game state so it can begin
+  (reset-game-state!))
 
 (define randomize-interval 10)
 (define time-until-randomize randomize-interval)
+(define time-left-in-game 100)
 
 (define (calculate-new-pos player delta-x delta-y)
   (cons (+ (player-x player) delta-x)
         (+ (player-y player) delta-y)))
-
-(define (list-take lst item-index)
-  (let loop ((remaining lst)
-             (new-list '())
-             (index 0))
-    (if (null? remaining)
-        (begin
-          (display "BAD INDEX\n")
-          nil)
-        (if (eqv? index item-index)
-            ;; Put the item at the front of the new-list
-            ;; and remove it from where it previously was
-            (cons (car remaining)
-                  (append new-list (cdr remaining)))
-            (loop (cdr remaining)
-                  ;; TODO: Use set-cdr! to make this faster
-                  (append new-list
-                          (list (car remaining)))
-                  (+ index 1))))))
 
 (define (randomize-positions! entities valid-positions setter acceptable?)
   (let loop ((remaining entities)
@@ -131,7 +172,7 @@
                                (item-y (car remaining))))
                   (begin
                     ;; TODO: Add item to inventory
-                    (display "PICKED UP ITEM!\n")
+                    (change-state! 'win)
                     (loop (cdr remaining)
                           new-items))
                   (loop (cdr remaining)
@@ -148,8 +189,43 @@
 
   ;; TODO: Check if we walked over a trap
 
-  ;; TODO: Move all entities
-  )
+  ;; Move all patrols
+  (map (lambda (patrol)
+         (move-patrol patrol
+                      (player-x player)
+                      (player-y player)
+                      (lambda (x y)
+                        (world-is-passable? world x y))))
+       patrols)
+
+  ;; Check if the player is caught
+  (map (lambda (patrol)
+         (if (and (eqv? (player-x player)
+                        (patrol-x patrol))
+                  (eqv? (player-y player)
+                        (patrol-y patrol)))
+             (change-state! 'lose)))
+       patrols))
+
+(define (handle-game-input-event input-event) :export
+  (if (eqv? state 'playing)
+      ;; Handle game input
+      (let ((binding (and (input-event-key-down? input-event)
+                          (assq (input-event-key-code input-event)
+                                key-bindings))))
+        (if binding (handle-game-event (cdr binding))))
+
+      ;; Handle prompt input
+      (if (input-event-key-up? input-event)
+          (if (eqv? input-key-code-y
+                    (input-event-key-code input-event))
+              ;; Start the game over!
+              (reset-game-state!)
+
+              ;; Quit the game
+              (if (eqv? input-key-code-n
+                        (input-event-key-code input-event))
+                  (change-state! 'quit))))))
 
 (define (handle-game-event event) :export
   (let ((new-pos
@@ -171,14 +247,6 @@
                              (car new-pos)
                              (cdr new-pos))))))))
 
-(define (is-close-to-player? player x y distance)
-  (let ((result
-         (and (<= (abs (- (player-x player) x))
-                  distance)
-              (<= (abs (- (player-y player) y))
-                  distance))))
-    result))
-
 (define (randomize-all-entities!)
   ;; Randomize patrol positions
   (randomize-positions! patrols
@@ -187,7 +255,10 @@
                           (patrol-x-set! patrol x)
                           (patrol-y-set! patrol  y))
                         (lambda (x y)
-                          (not (is-close-to-player? player x y 1))))
+                          (not (is-close-to-position? (player-x player)
+                                                      (player-y player)
+                                                      x y
+                                                      1))))
 
   ;; Randomize item positions
   (randomize-positions! items
@@ -196,27 +267,56 @@
                           (item-x-set! item x)
                           (item-y-set! item y))
                         (lambda (x y)
-                          (not (is-close-to-player? player x y 3)))))
+                          (not (is-close-to-position? (player-x player)
+                                                      (player-y player)
+                                                      x y
+                                                      3)))))
 
 (define (update-game time-delta) :export
-  ;; Update the randomization timer
-  (set! time-until-randomize
-        (- time-until-randomize time-delta))
-
-  ;; If it's time to randomize, do it
-  (if (< time-until-randomize 0)
+  (if (eqv? state 'quit)
+      ;; If we're in the quit state, exit the loop by returning nil
+      nil
       (begin
-        ;; Randomize item positions
-        (randomize-all-entities!)
+        ;; Update the randomization timer
+        (set! time-until-randomize
+              (- time-until-randomize time-delta))
 
-        ;; Reset the timer
-        (set! time-until-randomize randomize-interval)))
-  t)
+        ;; Update the game timer
+        (set! time-left-in-game (max 0
+                                     (- time-left-in-game
+                                        time-delta)))
+
+        ;; Is the game over?
+        (if (eqv? time-left-in-game 0)
+            (display "GAME OVER MAN\n"))
+
+        ;; If it's time to randomize, do it
+        (if (< time-until-randomize 0)
+            (begin
+              ;; Randomize item positions
+              (randomize-all-entities!)
+
+              ;; Reset the timer
+              (set! time-until-randomize randomize-interval)))
+
+        ;; Continue running the game loop
+        t)))
 
 (define (world->screen offset-x offset-y)
   (lambda (x y)
     (cons (+ offset-x (* x tile-size))
           (+ offset-y (* y tile-size)))))
+
+(define (render-text-centered renderer
+                              font
+                              text
+                              x y
+                              text-width text-height)
+  (render-text renderer
+               font
+               text
+               (- x (/ text-width 2))
+               (- y (/ text-height 2))))
 
 (define (render-game renderer window-width window-height) :export
   (let ((world-x (- (/ window-width 2)
@@ -240,9 +340,9 @@
     ;; Render the patrols
     (map (lambda (patrol)
            (render-patrol renderer
-                        patrol
-                        (world->screen world-x world-y)
-                        tile-size))
+                          patrol
+                          (world->screen world-x world-y)
+                          tile-size))
          patrols)
 
     ;; Render the player
@@ -258,4 +358,44 @@
                         (* 200 (max 0 (/ time-until-randomize
                                          randomize-interval)))
                         50
-                        (rgb 255 0 255))))
+                        (rgb 255 0 255))
+
+    ;; Draw the time remaining right-aligned under the map
+    (let ((time-text
+           (string-append "Time Remaining: "
+                          (number->string time-left-in-game))))
+      (render-text renderer
+                   small-font
+                   time-text
+                   (- (- window-width
+                         (font-text-width small-font time-text))
+                      world-x)
+                   (- window-height 90)))
+
+    ;; Draw the game state prompt if necessary
+    (if (not (eqv? state 'playing))
+        (begin
+          ;; Fade the screen a little
+          (renderer-draw-rect renderer
+                              0 0
+                              window-width
+                              window-height
+                              fade-color)
+
+          ;; Draw the result text
+          (render-text-centered renderer
+                                result-font
+                                result-text
+                                (/ window-width 2)
+                                (/ window-height 2)
+                                result-text-width
+                                result-text-height)
+
+          ;; Draw the prompt
+          (render-text-centered renderer
+                                prompt-font
+                                prompt-text
+                                (/ window-width 2)
+                                (+ 100 (/ window-height 2))
+                                prompt-text-width
+                                prompt-text-height)))))

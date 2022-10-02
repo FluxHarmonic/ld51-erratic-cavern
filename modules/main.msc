@@ -33,28 +33,20 @@
 (define current-fps (make-fps-counter))
 
 ;; These will track the current game logic and render functions
+(define current-input-handler handle-game-input-event)
 (define current-updater update-game)
 (define current-renderer render-game)
 
 ;; Initialize the game
 (init-game)
 
-(define key-bindings
-  (list (cons input-key-code-w 'player-move-up)
-        (cons input-key-code-s 'player-move-down)
-        (cons input-key-code-a 'player-move-left)
-        (cons input-key-code-d 'player-move-right)))
-
 (define (handle-input-events)
   (let next-event ((input-event (input-event-take input-state)))
     (if input-event
         (begin
-          (let ((binding (and (input-event-key-down? input-event)
-                              (assq (input-event-key-code input-event)
-                                    key-bindings))))
-            (if binding
-                (handle-game-event (cdr binding)))
-            (next-event (input-event-take input-state)))))))
+          (if current-input-handler
+              (current-input-handler input-event))
+          (next-event (input-event-take input-state))))))
 
 (define (main-updater time-delta)
   (if (not (window-needs-close? window))

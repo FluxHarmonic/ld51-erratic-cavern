@@ -1,15 +1,23 @@
 (define-module (erratic patrol)
-  (import (substratic renderer)))
+  (import (mesche math)
+          (substratic renderer)
+          (erratic utils)))
+
+(define max-steps 10)
 
 (define-record-type patrol
   (fields x
-          y))
+          y
+          direction
+          steps))
 
 (define (create-patrol x y) :export
   (make-patrol :x x
-               :y y))
+               :y y
+               :direction 'left
+               :steps 0))
 
-(define patrol-color (rgb 71 90 24))
+(define patrol-color (rgb 77 46 82))
 
 (define (render-patrol renderer patrol world->screen tile-size) :export
   (let ((pos (world->screen (patrol-x patrol)
@@ -22,3 +30,81 @@
                         patrol-size
                         patrol-size
                         patrol-color)))
+;; 2 states for patrol:
+;; - Wander in a particular direction
+;; - Pursue the player
+
+(define (pick-new-direction! patrol)
+  (let ((directions '(left right up down)))
+    (let ((direction (car (list-take directions (rand-int 4)))))
+      (patrol-steps-set! patrol (rand-int max-steps))
+      (patrol-direction-set! patrol direction)
+      direction)))
+
+(define (wander-patrol patrol passable?)
+  (let ((direction (patrol-direction patrol))
+        (x (patrol-x patrol))
+        (y (patrol-y patrol)))
+    ;; If there are steps remaining in the current direction, take a step.  If the
+    ;; step in that direction is not passable, pick a new direction and go that
+    ;; way, resetting the step count.
+
+    ;; Reset the direction and steps if we're out of steps
+    (if (eqv? 0 (patrol-steps patrol))
+        ;; Pick a new direction and step count
+        (set! direction (pick-new-direction! patrol))
+
+        ;; We're about to take a step!
+        (patrol-steps-set! patrol
+                           (- (patrol-steps patrol) 1)))
+
+    ;; Wander in the current direction
+    (let ((move-delta
+           (if (eqv? direction 'left)
+               (cons -1 0)
+               (if (eqv? direction 'right)
+                   (cons 1 0)
+                   (if (eqv? direction 'up)
+                       (cons 0 -1)
+                       (if (eqv? direction 'down)
+                           (cons 0 1)
+                           (cons 0 0)))))))
+      (let ((new-x (+ x (car move-delta)))
+            (new-y (+ y (cdr move-delta))))
+        ;; Determine whether we can move in this direction
+        (if (passable? new-x new-y)
+            ;; It's passable, apply the move
+            (begin
+              (patrol-x-set! patrol new-x)
+              (patrol-y-set! patrol new-y))
+            ;; Pick a new direction, it will go into effect on the next move
+            (pick-new-direction! patrol))))))
+
+(define (move-patrol patrol player-x player-y passable?) :export
+  ;; If player is within 5 tiles, pursue
+  ;; otherwise resume wandering phase
+  (let ((x (patrol-x patrol))
+        (y (patrol-y patrol)))
+    (if (is-close-to-position? player-x
+                               player-y
+                               x y
+                               3)
+        ;; Decide which direction to move for pursuit
+        (let ((move-x (- player-x x))
+              (move-y (- player-y y)))
+          (let ((new-x (+ x (/ (abs move-x) move-x)))
+                (new-y (+ y (/ (abs move-y) move-y))))
+            ;; First see if we can apply the movement in both directions.
+            ;; If both doesn't work, try either axis
+            (let ((new-pos
+                   (if (passable? new-x y)
+                       (cons new-x y)
+                       (if (passable? x new-y)
+                           (cons x new-y)
+                           (begin
+                             ;; TODO: Go back to wandering state
+                             (cons x y))))))
+              (patrol-x-set! patrol (car new-pos))
+              (patrol-y-set! patrol (cdr new-pos)))))
+        ;; Wander a bit
+        (wander-patrol patrol passable?))))
